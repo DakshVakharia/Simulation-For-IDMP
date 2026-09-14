@@ -1,0 +1,44 @@
+# Cloud filter chain feeding IDMP from this project's simulated depth camera.
+#
+# Adapted from the real rig's config/cameraFilterChain.yaml in the
+# Semantic-Obstacle-Classification-with-IDMP/rmp workspace: same two stages
+# (crop then voxelize), same generous crop bounds (this sim's workcell is
+# well inside them -- table half-extents are 0.8m x 0.55m around the
+# base_link origin). The real chain's third stage, RobotBodyFilterPointCloud2,
+# is deliberately NOT included here: it needs a /robot_description URDF and a
+# full robot TF tree to test point-containment against, neither of which this
+# sim publishes (mujoco_ros_cell publishes only base_link -> tcp_link and the
+# two camera optical frames, not the whole arm's link tree). Skipping it just
+# means points on the arm's own body are not self-filtered out of the cloud.
+input_queue_size: 1
+output_queue_size: 1
+cloud_filter_chain:
+  - name: CropBoxFilter
+    type: point_cloud2_filters/CropBoxFilterPointCloud2
+    params:
+      active: true
+      input_frame: "base_link"
+      output_frame: "base_link"
+      keep_organized: false
+      negative: False
+      min_x: -2
+      max_x: 10.2
+      min_y: -1.0
+      max_y: 12
+      min_z: -2.0
+      max_z: 11.0
+  - name: VoxelGridFilter
+    type: point_cloud2_filters/VoxelGridFilterPointCloud2
+    params:
+      active: true
+      input_frame: "base_link"
+      output_frame: "base_link"
+      leaf_size_x: 0.02
+      leaf_size_y: 0.02
+      leaf_size_z: 0.02
+      min_points_per_voxel: 2
+      downsample_all_data: False
+      filter_field_name: "x"
+      filter_limit_min: -5
+      filter_limit_max: 5
+      negative: False

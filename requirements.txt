@@ -1,0 +1,11 @@
+# Direct dependencies only -- the packages this project actually imports.
+# Everything else (glfw, PyOpenGL, etils, ...) is pulled in automatically
+# as a transitive dependency and should NOT be listed here.
+#
+# Recreate the environment from scratch with:
+#     python -m venv .venv
+#     .venv\Scripts\python.exe -m pip install -r requirements.txt
+
+mujoco==3.12.0      # physics simulation + viewer
+numpy==2.5.2        # vector math; the backbone of fields.py
+trimesh==5.0.0      # mesh/point-cloud loading for fit_containers.py

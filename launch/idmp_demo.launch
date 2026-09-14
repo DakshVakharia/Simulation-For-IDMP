@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<!--
+  idmp_demo.launch
+
+  Full chain: this project's simulated depth camera -> a real point cloud ->
+  IDMP's voxel occupancy map -> RViz, so IDMP's octree/voxel output can
+  actually be watched update live against the simulated workcell.
+
+      roslaunch mujoco_sim idmp_demo.launch
+
+  Requires, in order on ROS_PACKAGE_PATH / sourced workspaces:
+    - this repo (mujoco_sim, mujoco_ros_cell.py), see sim.launch
+    - ~/catkin_ws (ur_ros_driver, the message stub sim.launch needs)
+    - the Semantic-Obstacle-Classification-with-IDMP/rmp workspace (idmp_ros)
+
+  Pipeline, all in one nodelet manager so no serialization cost between the
+  image->cloud and cloud->voxel steps:
+
+      /camera/depth/image_raw  -\
+      /camera/depth/camera_info -+-> depth_image_proc/point_cloud_xyz -> /camera/depth/points
+                                        |
+                                        v
+                        idmp_filter_chain.yaml (crop, then voxelize @ 2cm)
+                                        |
+                                        v
+                                  /points_filt  ==>  idmp node  ==>  /gp_pcl
+                                                                        |
+                                                                        v
+                                                                      RViz
+
+  Args:
+      viewer:=false   passed through to sim.launch (see its own docs)
+      rviz:=false     skip starting RViz (e.g. to drive it separately)
+-->
+<launch>
+  <arg name="viewer" default="true"/>
+  <arg name="rviz" default="true"/>
+
+  <include file="$(find mujoco_sim)/launch/sim.launch">
+    <arg name="viewer" value="$(arg viewer)"/>
+  </include>
+
+  <node name="cloud_nodelet_manager" pkg="nodelet" type="nodelet"
+        args="manager" output="screen"/>
+
+  <node name="depth_to_cloud" pkg="nodelet" type="nodelet"
+        args="load depth_image_proc/point_cloud_xyz cloud_nodelet_manager"
+        output="screen">
+    <remap from="image_rect" to="/camera/depth/image_raw"/>
+    <remap from="camera_info" to="/camera/depth/camera_info"/>
+    <remap from="points" to="/camera/depth/points"/>
+  </node>
+
+  <node name="idmp_filter" pkg="sensor_filters" type="pointcloud2_filter_chain"
+        output="screen">
+    <rosparam command="load"
+              file="$(find mujoco_sim)/config/idmp_filter_chain.yaml"/>
+    <remap from="~input" to="/camera/depth/points"/>
+    <remap from="~output" to="/points_filt"/>
+  </node>
+
+  <rosparam command="load" file="$(find mujoco_sim)/config/idmp_params.yaml"/>
+  <node name="idmp_ros" pkg="idmp_ros" type="idmp" output="screen" respawn="true"/>
+
+  <node if="$(arg rviz)" name="rviz" pkg="rviz" type="rviz"
+        args="-d $(find rmp2_ros)/config/RvizConf.rviz" output="screen"/>
+</launch>

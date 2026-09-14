@@ -1,0 +1,73 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 470" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1971c2"/></marker>
+    <marker id="a-orange" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#f08c00"/></marker>
+    <marker id="a-gray" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#adb5bd"/></marker>
+    <marker id="a-violet" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7048e8"/></marker>
+  </defs>
+
+  <rect x="0" y="0" width="700" height="470" fill="#ffffff"/>
+  <text x="20" y="28" font-size="17" font-weight="700" fill="#212529">Tangential Field Obstacle Avoidance</text>
+  <text x="20" y="48" font-size="13" fill="#868e96">The line-of-sight attraction is offset from the sphere center &#8594; it tips the balance toward the shorter way around.</text>
+
+  <!-- obstacle sphere -->
+  <circle cx="300" cy="200" r="100" fill="#ff6b6b" fill-opacity="0.13" stroke="#e03131" stroke-width="2"/>
+  <circle cx="300" cy="200" r="3" fill="#e03131"/>
+  <text x="300" y="205" font-size="12" fill="#e03131" text-anchor="middle" dx="8">center</text>
+  <text x="352" y="150" font-size="13" fill="#e03131" font-weight="600">obstacle (sphere)</text>
+
+  <!-- tangential field circulation (counter-clockwise on screen) -->
+  <line x1="315" y1="72"  x2="283" y2="72"  stroke="#7048e8" stroke-width="2" marker-end="url(#a-violet)"/>
+  <line x1="428" y1="215" x2="428" y2="183" stroke="#7048e8" stroke-width="2" marker-end="url(#a-violet)"/>
+  <line x1="285" y1="328" x2="317" y2="328" stroke="#7048e8" stroke-width="2" marker-end="url(#a-violet)"/>
+  <line x1="172" y1="185" x2="172" y2="217" stroke="#7048e8" stroke-width="2" marker-end="url(#a-violet)"/>
+  <text x="300" y="60" font-size="12" fill="#7048e8" text-anchor="middle">tangential field (circulation)</text>
+
+  <!-- rerouted path along the shorter (bottom) side -->
+  <path d="M252,288 Q325,362 397,222" fill="none" stroke="#f08c00" stroke-width="2" stroke-dasharray="6,5" opacity="0.65" marker-end="url(#a-orange)"/>
+  <text x="330" y="392" font-size="12" fill="#f08c00">rerouted path (shorter side)</text>
+
+  <!-- line of sight EE -> goal (offset from center) -->
+  <line x1="70" y1="370" x2="580" y2="140" stroke="#495057" stroke-width="1.6" stroke-dasharray="8,5"/>
+  <text x="440" y="205" font-size="12" fill="#495057" transform="rotate(-24 440 205)">line of sight (EE &#8594; goal)</text>
+
+  <!-- offset d from center to line of sight -->
+  <line x1="300" y1="200" x2="325" y2="255" stroke="#e03131" stroke-width="1.4" stroke-dasharray="3,3"/>
+  <text x="330" y="238" font-size="12" fill="#e03131">offset d</text>
+
+  <!-- field start / end where LOS crosses the sphere -->
+  <circle cx="252" cy="288" r="5" fill="#1971c2"/>
+  <text x="232" y="283" font-size="13" font-weight="700" fill="#1971c2">S</text>
+  <circle cx="397" cy="222" r="5" fill="#1971c2"/>
+  <text x="405" y="216" font-size="13" font-weight="700" fill="#1971c2">E</text>
+
+  <!-- force decomposition at approach point Q -->
+  <circle cx="160" cy="330" r="3.5" fill="#212529"/>
+  <!-- attraction along line of sight -->
+  <line x1="160" y1="330" x2="224" y2="301" stroke="#1971c2" stroke-width="3" marker-end="url(#a-blue)"/>
+  <text x="196" y="292" font-size="12" fill="#1971c2" font-weight="600">F_attract</text>
+  <!-- winning tangential (reroute, shorter side) -->
+  <line x1="160" y1="330" x2="214" y2="389" stroke="#f08c00" stroke-width="3.5" marker-end="url(#a-orange)"/>
+  <text x="196" y="405" font-size="12" fill="#f08c00" font-weight="600">F_tangential (wins)</text>
+  <!-- opposing tangential (loses) -->
+  <line x1="160" y1="330" x2="122" y2="290" stroke="#adb5bd" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#a-gray)"/>
+  <text x="70" y="285" font-size="12" fill="#adb5bd">opposing tangential (loses)</text>
+
+  <!-- EE and goal markers -->
+  <circle cx="70" cy="370" r="7" fill="#2f9e44" stroke="#ffffff" stroke-width="1.5"/>
+  <text x="80" y="388" font-size="13" fill="#2f9e44" font-weight="600">EE (current)</text>
+  <circle cx="580" cy="140" r="7" fill="#e03131" stroke="#ffffff" stroke-width="1.5"/>
+  <text x="592" y="136" font-size="13" fill="#e03131" font-weight="600">Goal</text>
+
+  <!-- legend -->
+  <rect x="470" y="250" width="215" height="205" rx="6" fill="#f8f9fa" stroke="#dee2e6"/>
+  <text x="482" y="272" font-size="12" font-weight="700" fill="#212529">Legend</text>
+  <circle cx="490" cy="290" r="6" fill="#2f9e44"/><text x="504" y="294" font-size="11.5" fill="#495057">EE current position</text>
+  <circle cx="490" cy="311" r="6" fill="#e03131"/><text x="504" y="315" font-size="11.5" fill="#495057">Goal</text>
+  <line x1="482" y1="331" x2="498" y2="331" stroke="#495057" stroke-width="1.6" stroke-dasharray="6,4"/><text x="504" y="335" font-size="11.5" fill="#495057">line of sight (EE &#8594; goal)</text>
+  <line x1="482" y1="352" x2="498" y2="352" stroke="#1971c2" stroke-width="3" marker-end="url(#a-blue)"/><text x="504" y="356" font-size="11.5" fill="#495057">attraction (goal)</text>
+  <line x1="482" y1="373" x2="498" y2="373" stroke="#f08c00" stroke-width="3" marker-end="url(#a-orange)"/><text x="504" y="377" font-size="11.5" fill="#495057">tangential reroute (wins)</text>
+  <line x1="482" y1="394" x2="498" y2="394" stroke="#adb5bd" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#a-gray)"/><text x="504" y="398" font-size="11.5" fill="#495057">opposing tangential (loses)</text>
+  <line x1="482" y1="415" x2="498" y2="415" stroke="#7048e8" stroke-width="2" marker-end="url(#a-violet)"/><text x="504" y="419" font-size="11.5" fill="#495057">tangential field circulation</text>
+  <text x="482" y="440" font-size="11.5" fill="#495057"><tspan font-weight="700" fill="#1971c2">S</tspan> / <tspan font-weight="700" fill="#1971c2">E</tspan> = field start / end (LOS &#8745; sphere)</text>
+</svg>

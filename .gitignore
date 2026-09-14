@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# scene.py compile scratch files (see scripts/scene.py _compile_model())
+assets/robots/ur5e/_scene_ur5e_nokeyframe.xml
+assets/robots/ur5e/_scene_scratch.xml
+
+# Generated run outputs (rgb/depth/point-cloud dumps)
+out/
+
+# ROS
+*.log
+.catkin_tools/
+
+# Editor/tool state
+.claude/
+CLAUDE.md

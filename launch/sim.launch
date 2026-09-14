@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!--
+  sim.launch
+
+  Brings up mujoco_ros_cell.py: one MuJoCo world (table, wall, clutter, UR5e)
+  stepped by one process, serving both the fake-arm topics/services and the
+  fake-camera topics/TF out of that same physics state, and (by default) also
+  showing that world in an interactive MuJoCo window. roslaunch starts its own
+  roscore automatically if one isn't already running, so this is the one
+  command that replaces starting roscore and the node by hand.
+
+      roslaunch mujoco_sim sim.launch
+
+  Args:
+      viewer:=false      run headless, no window (topics still publish)
+      camera_rate:=15    camera render/publish rate in Hz (see the node's
+                          module docstring for why it runs slower than the
+                          125 Hz robot loop)
+
+  Requires this package to be discoverable by rospack/roslaunch: either
+  symlink this repo into ~/catkin_ws/src/ or add its path to
+  ROS_PACKAGE_PATH. The node also needs ROS's own Python (not the project's
+  venv) and the ur_ros_driver message package. See CLAUDE.md.
+-->
+<launch>
+  <arg name="camera_rate" default="15"/>
+  <arg name="viewer" default="true"/>
+
+  <node if="$(arg viewer)"
+        name="mujoco_ros_cell"
+        pkg="mujoco_sim"
+        type="mujoco_ros_cell.py"
+        args="--viewer"
+        output="screen">
+    <param name="camera_rate" value="$(arg camera_rate)"/>
+  </node>
+
+  <node unless="$(arg viewer)"
+        name="mujoco_ros_cell"
+        pkg="mujoco_sim"
+        type="mujoco_ros_cell.py"
+        output="screen">
+    <param name="camera_rate" value="$(arg camera_rate)"/>
+  </node>
+</launch>

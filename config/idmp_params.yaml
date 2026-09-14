@@ -1,0 +1,41 @@
+# IDMP mapping parameters for this project's simulated workcell.
+#
+# Adapted from the real rig's config/params_live.yaml in the
+# Semantic-Obstacle-Classification-with-IDMP/rmp workspace. Two changes from
+# that file:
+#   idmp_pcl_topic  -> "/points_filt", what idmp_filter_chain.yaml (this
+#                      project's config/, not the real rig's) actually
+#                      publishes.
+#   idmp_env_pcd    -> "" (off). The real file preloads a captured
+#                      environment_cloud_merge.pcd; there is no equivalent
+#                      capture for this sim, and idmp_ros looks the path up
+#                      relative to ITS OWN package (idmp_ros/config/), not
+#                      this one, so pointing it at a file here would not
+#                      resolve anyway.
+# idmp_caminfo_topic's frame name, "camera_depth_optical_frame", already
+# matches what scripts/mujoco_ros_cell.py publishes -- no change needed there.
+idmp_rleng: 2
+idmp_tree_hl_min: 0.05
+idmp_tree_hl_max: 3.2
+idmp_tree_hl_clust: 0.1
+idmp_tree_hl_init: 1.6
+idmp_map_scale: 200
+idmp_obs_skip: 10
+idmp_filt_outl: True
+
+idmp_pub_pcl: True
+idmp_world_frame: "base_link"
+idmp_pcl_topic: "/points_filt"
+
+idmp_env_pcd: ""
+idmp_min_env_points: 100
+
+idmp_caminfo_topic:
+  - ["/camera/depth/camera_info", "camera_depth_optical_frame"]
+
+idmp_dynamic: True
+idmp_fusion: False
+
+idmp_dyn_tresh: 0.05
+idmp_fus_min: 0.0005
+idmp_fus_max: 0.0025

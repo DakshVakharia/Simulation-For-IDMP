@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mujoco_sim</name>
+  <version>0.0.1</version>
+  <description>
+    MuJoCo simulation workbench. This package exists only so roslaunch/rosrun
+    can find the MuJoCo hardware-impersonation nodes in scripts/ -- it is not
+    built with catkin (pure Python, no messages).
+  </description>
+  <maintainer email="daksh.vakharia@gmail.com">daksh</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <!-- Not yet present in this workspace. The nodes import these lazily so
+       the check flag works without them. -->
+  <exec_depend>ur_ros_driver</exec_depend>
+  <exec_depend>orbbec_camera</exec_depend>
+
+  <export>
+  </export>
+</package>
