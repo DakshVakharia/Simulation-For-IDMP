@@ -68,6 +68,7 @@ from pathlib import Path
 
 import mujoco
 import mujoco.viewer
+import numpy as np
 
 
 # ----------------------------------------------------------------------
@@ -178,6 +179,166 @@ BLOCK_SPECS = [
 ]
 
 # ----------------------------------------------------------------------
+# Human figure, reaching for the bottle without touching it. Built as a
+# nested body chain (base -> pelvis -> shoulder -> elbow) with NO joints: it
+# is static scenery like the monitor (GROUP_ENV), so it can never tip or
+# drift into the bottle, but each body carries its own rotation, so posing
+# it is just editing the angles below.
+#
+# TO POSE IT, edit only these HUMAN_* numbers (angles in degrees, all 0 =
+# standing straight with arms hanging straight down):
+#   placement  HUMAN_BASE_XY, HUMAN_YAW_DEG
+#   body       HUMAN_TORSO_LEAN_DEG
+#   arms       HUMAN_{REACH,SIDE}_SHOULDER_PITCH_DEG / _SWING_DEG / _ELBOW_DEG
+# then run `python scripts/scene.py --check`, which prints how far each
+# body part is from every object, and fails if the hand touches anything.
+#
+# HUMAN_AUTO_PLACE = True treats HUMAN_BASE_XY as a starting point only: the
+# whole figure is slid horizontally so the reaching hand's surface ends
+# exactly HUMAN_REACH_CLEARANCE from the bottle's surface, whatever pose you
+# choose. Set it False to put the feet exactly at HUMAN_BASE_XY.
+# ----------------------------------------------------------------------
+
+HUMAN_AUTO_PLACE = True
+HUMAN_BASE_XY = (-1.15, 0.20)      # between the feet, on the floor
+HUMAN_YAW_DEG = 15.0               # 0 = facing +x (toward the table)
+HUMAN_TORSO_LEAN_DEG = 30.0        # + bends forward at the hips
+
+# pitch: + raises the arm forward (90 = pointing straight ahead)
+# swing: + moves the hand across toward the body's centre line
+# elbow: + bends the forearm forward/up
+HUMAN_REACH_SHOULDER_PITCH_DEG = 40.0     # right arm
+HUMAN_REACH_SHOULDER_SWING_DEG = 0.0
+HUMAN_REACH_ELBOW_DEG = 60.0
+HUMAN_SIDE_SHOULDER_PITCH_DEG = 20.0      # left arm, relaxed
+HUMAN_SIDE_SHOULDER_SWING_DEG = 0.0
+HUMAN_SIDE_ELBOW_DEG = 15.0
+
+HUMAN_REACH_CLEARANCE = 0.05
+
+HUMAN_HIP_HEIGHT = 0.90
+HUMAN_TORSO_LEN = 0.45             # hip to shoulder line
+HUMAN_SHOULDER_HALF_WIDTH = 0.20
+HUMAN_UPPER_ARM_LEN = 0.30
+HUMAN_FOREARM_LEN = 0.27
+HUMAN_HAND_RADIUS = 0.04
+HUMAN_HEAD_RADIUS = 0.11
+
+HUMAN_SKIN_RGBA = "0.88 0.68 0.55 1"
+HUMAN_SHIRT_RGBA = "0.25 0.35 0.55 1"
+HUMAN_PANTS_RGBA = "0.15 0.15 0.20 1"
+
+
+# Rotations are emitted as quats rather than euler angles because the
+# included ur5e.xml switches the compiler to radians while the no-robot
+# scene stays in degrees -- a quat means the same thing in both.
+def _quat(axis, deg):
+    q = np.zeros(4)
+    mujoco.mju_axisAngle2Quat(q, np.asarray(axis, float), np.radians(deg))
+    return q
+
+
+def _quat_mul(a, b):
+    q = np.zeros(4)
+    mujoco.mju_mulQuat(q, a, b)
+    return q
+
+
+def _rotate(q, v):
+    out = np.zeros(3)
+    mujoco.mju_rotVecQuat(out, np.asarray(v, float), q)
+    return out
+
+
+def _arm_quats(side, pitch, swing, elbow):
+    """side = -1 for the right arm (body -y), +1 for the left."""
+    shoulder = _quat_mul(_quat((0, 1, 0), -pitch), _quat((1, 0, 0), -side * swing))
+    return shoulder, _quat((0, 1, 0), -elbow)
+
+
+def _human_frames():
+    q_shoulder, q_elbow = _arm_quats(-1, HUMAN_REACH_SHOULDER_PITCH_DEG,
+                                     HUMAN_REACH_SHOULDER_SWING_DEG, HUMAN_REACH_ELBOW_DEG)
+    return dict(base=_quat((0, 0, 1), HUMAN_YAW_DEG),
+                pelvis=_quat((0, 1, 0), HUMAN_TORSO_LEAN_DEG),
+                reach_shoulder=q_shoulder, reach_elbow=q_elbow)
+
+
+def _human_hand_world(base_xy):
+    """Forward kinematics of the reaching hand's centre -- must mirror the
+    body chain _human_xml() emits."""
+    f = _human_frames()
+    p = np.array([0.0, 0.0, -HUMAN_FOREARM_LEN])
+    p = np.array([0.0, 0.0, -HUMAN_UPPER_ARM_LEN]) + _rotate(f["reach_elbow"], p)
+    p = np.array([0.0, -HUMAN_SHOULDER_HALF_WIDTH, HUMAN_TORSO_LEN]) + _rotate(f["reach_shoulder"], p)
+    p = np.array([0.0, 0.0, HUMAN_HIP_HEIGHT]) + _rotate(f["pelvis"], p)
+    return np.array([base_xy[0], base_xy[1], -TABLE_HEIGHT]) + _rotate(f["base"], p)
+
+
+def human_base_xy():
+    if not HUMAN_AUTO_PLACE:
+        return tuple(HUMAN_BASE_XY)
+    hand = _human_hand_world(HUMAN_BASE_XY)
+    if not 0.0 < hand[2] < 2 * BOTTLE_BODY_HALF_HEIGHT:
+        raise ValueError(
+            f"human hand ends at z={hand[2]:.3f}, outside the bottle body's height "
+            f"(0 .. {2 * BOTTLE_BODY_HALF_HEIGHT:.2f}), so HUMAN_AUTO_PLACE can't aim it "
+            "at the bottle's side -- change the lean/shoulder/elbow angles, or set "
+            "HUMAN_AUTO_PLACE = False")
+    offset = hand[:2] - np.asarray(BOTTLE_POS_XY)
+    dist = np.linalg.norm(offset)
+    want = BOTTLE_BODY_RADIUS + HUMAN_HAND_RADIUS + HUMAN_REACH_CLEARANCE
+    return tuple(np.asarray(HUMAN_BASE_XY) + offset / dist * (want - dist))
+
+
+def _human_xml(group):
+    bx, by = human_base_xy()
+    f = _human_frames()
+    L1, L2, W, T = (HUMAN_UPPER_ARM_LEN, HUMAN_FOREARM_LEN,
+                    HUMAN_SHOULDER_HALF_WIDTH, HUMAN_TORSO_LEN)
+
+    def q(quat):
+        return " ".join(f"{v:.6f}" for v in quat)
+
+    def leg(name, y):
+        return f"""
+      <geom name="human_leg_{name}" type="capsule" group="{group}"
+            fromto="0 {y:.4f} {HUMAN_HIP_HEIGHT:.4f}  0 {y:.4f} 0.0700" size="0.07"
+            rgba="{HUMAN_PANTS_RGBA}"/>
+      <geom name="human_foot_{name}" type="box" group="{group}" pos="0.06 {y:.4f} 0.03"
+            size="0.12 0.05 0.03" rgba="{HUMAN_PANTS_RGBA}"/>"""
+
+    def arm(name, side, q_shoulder, q_elbow):
+        return f"""
+        <body name="human_{name}_shoulder" pos="0 {side * W:.4f} {T:.4f}" quat="{q(q_shoulder)}">
+          <geom name="human_upper_arm_{name}" type="capsule" group="{group}"
+                fromto="0 0 0  0 0 {-L1:.4f}" size="0.045" rgba="{HUMAN_SHIRT_RGBA}"/>
+          <body name="human_{name}_elbow" pos="0 0 {-L1:.4f}" quat="{q(q_elbow)}">
+            <geom name="human_forearm_{name}" type="capsule" group="{group}"
+                  fromto="0 0 0  0 0 {-L2:.4f}" size="0.035" rgba="{HUMAN_SKIN_RGBA}"/>
+            <geom name="human_hand_{name}" type="sphere" group="{group}"
+                  pos="0 0 {-L2:.4f}" size="{HUMAN_HAND_RADIUS:.4f}" rgba="{HUMAN_SKIN_RGBA}"/>
+          </body>
+        </body>"""
+
+    side_shoulder, side_elbow = _arm_quats(+1, HUMAN_SIDE_SHOULDER_PITCH_DEG,
+                                           HUMAN_SIDE_SHOULDER_SWING_DEG, HUMAN_SIDE_ELBOW_DEG)
+    return f"""
+    <body name="human" pos="{bx:.4f} {by:.4f} {-TABLE_HEIGHT:.4f}" quat="{q(f['base'])}">
+{leg("r", -0.10)}{leg("l", 0.10)}
+      <body name="human_pelvis" pos="0 0 {HUMAN_HIP_HEIGHT:.4f}" quat="{q(f['pelvis'])}">
+        <geom name="human_torso" type="box" group="{group}" pos="0 0 {T / 2:.4f}"
+              size="0.10 0.17 {T / 2:.4f}" rgba="{HUMAN_SHIRT_RGBA}"/>
+        <geom name="human_neck" type="capsule" group="{group}"
+              fromto="0 0 {T:.4f}  0 0 {T + 0.08:.4f}" size="0.05" rgba="{HUMAN_SKIN_RGBA}"/>
+        <geom name="human_head" type="sphere" group="{group}"
+              pos="0 0 {T + 0.08 + HUMAN_HEAD_RADIUS:.4f}" size="{HUMAN_HEAD_RADIUS:.4f}"
+              rgba="{HUMAN_SKIN_RGBA}"/>
+{arm("reach", -1, f["reach_shoulder"], f["reach_elbow"])}{arm("side", +1, side_shoulder, side_elbow)}
+      </body>
+    </body>"""
+
+# ----------------------------------------------------------------------
 # ChArUco calibration board. Pose is COPIED VERBATIM from the real rig's
 # poses.yaml (marker "aruco_1", parent frame base_link == our world origin /
 # table top). Do not "fix" this transform -- it is deliberately hardcoded.
@@ -269,6 +430,7 @@ def build_scene_xml(include_robot: bool = True, camera_fovy=CAMERA_FOVY,
     bottle_neck_center_z = bottle_body_top_z + BOTTLE_NECK_HALF_HEIGHT
 
     blocks_xml = _blocks_xml(GROUP_CLUTTER)
+    human_xml = _human_xml(GROUP_ENV)
 
     include_xml = f'  <include file="{UR5E_NOKEY_NAME}"/>\n' if include_robot else ""
 
@@ -352,6 +514,9 @@ def build_scene_xml(include_robot: bool = True, camera_fovy=CAMERA_FOVY,
             size="{MONITOR_HALF_X:.4f} {MONITOR_HALF_Y:.4f} {MONITOR_HALF_Z:.4f}"
             rgba="{MONITOR_RGBA}"/>
     </body>
+
+    <!-- Human figure reaching for the bottle; pose via the HUMAN_* constants. -->
+{human_xml}
 
     <site name="robot_mount" pos="0 0 0" size="0.035" rgba="0.9 0.2 0.2 1"/>
 
@@ -500,6 +665,29 @@ def _clutter_z_ranges(model, data):
     return out
 
 
+def _check_human(model, data):
+    """Print each human part's nearest non-human geom; fail if the reaching
+    hand is closer than HUMAN_REACH_CLEARANCE or any part pokes into something."""
+    print("\n  -- human checks (robot, if present, at its home keyframe) --")
+    key_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_KEY, "home")
+    if key_id >= 0:
+        mujoco.mj_resetDataKeyframe(model, data, key_id)
+    mujoco.mj_forward(model, data)
+    names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, i) or "" for i in range(model.ngeom)]
+    human = [i for i, n in enumerate(names) if n.startswith("human_")]
+    others = [i for i, n in enumerate(names) if not n.startswith("human_") and n != "floor"]
+    bx, by = human_base_xy()
+    print(f"  base (between feet) at x={bx:+.3f} y={by:+.3f}")
+    for h in human:
+        dist, nearest = min((mujoco.mj_geomDistance(model, data, h, o, 1.0, None), o) for o in others)
+        print(f"  {names[h]:<22} nearest {names[nearest] or f'<unnamed:{nearest}>':<20} {dist * 100:6.1f} cm")
+        if names[h] == "human_hand_reach":
+            assert dist > HUMAN_REACH_CLEARANCE - 0.002, (
+                f"reaching hand is only {dist * 100:.1f} cm from {names[nearest]}")
+        else:
+            assert dist > -0.005, f"{names[h]} penetrates {names[nearest]} by {-dist * 100:.1f} cm"
+
+
 def _check_robot(model, data):
     print("\n  -- robot checks --")
     expected_joints = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
@@ -562,6 +750,7 @@ def main():
         print(f"    {name:<18} {zmin:+.4f} .. {zmax:+.4f}  {'OK' if ok else 'NOT ON TABLE'}")
     assert all_zero, "at least one clutter object is not resting exactly at z=0"
 
+    _check_human(model, data)
     if include_robot:
         _check_robot(model, data)
 

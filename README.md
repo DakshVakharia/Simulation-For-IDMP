@@ -37,11 +37,7 @@ UR5e. An RGB-D camera watches the bench from the front-left.
 
 The central design decision is **one world, one loop**: a single
 `MjModel`/`MjData` pair is stepped by a single process, and both the fake arm
-*and* the fake camera are served out of that same physics state. An earlier
-design ran the arm and the camera as two separate nodes, each stepping its own
-independent model — the camera never saw the arm, and its point cloud
-disagreed with whatever `/joint_states` claimed at that instant.
-`mujoco_ros_cell.py` exists to make that disagreement impossible.
+*and* the fake camera are served out of that same physics state. 
 
 Physics is real, not a kinematic puppet: gravity, joint constraints,
 contact/friction and position-servo actuator dynamics all run through
@@ -366,6 +362,47 @@ MONITOR_POS_XY = (0.0, 0.45)
 MONITOR_RGBA = "0.08 0.08 0.09 1"
 ```
 
+### 4.5b Human figure (static, reaching for the bottle)
+
+Built by `_human_xml()` in `scripts/scene.py` as a jointless body chain
+(feet → pelvis → shoulder → elbow → hand). It has no `<freejoint/>` and sits in
+`GROUP_ENV` like the monitor, so it can't tip over or drift into the bottle.
+To pose it, edit only these constants (angles in degrees; all 0 = standing
+straight with arms hanging down):
+
+```python
+HUMAN_AUTO_PLACE = True
+HUMAN_BASE_XY = (-1.15, 0.20)      # between the feet, on the floor
+HUMAN_YAW_DEG = 15.0               # 0 = facing +x (toward the table)
+HUMAN_TORSO_LEAN_DEG = 30.0        # + bends forward at the hips
+
+HUMAN_REACH_SHOULDER_PITCH_DEG = 40.0     # right arm: + raises it forward (90 = straight ahead)
+HUMAN_REACH_SHOULDER_SWING_DEG = 0.0      # + swings the hand toward the body's centre line
+HUMAN_REACH_ELBOW_DEG = 60.0              # + bends the forearm forward/up
+HUMAN_SIDE_SHOULDER_PITCH_DEG = 20.0      # left arm, same conventions
+HUMAN_SIDE_SHOULDER_SWING_DEG = 0.0
+HUMAN_SIDE_ELBOW_DEG = 15.0
+
+HUMAN_REACH_CLEARANCE = 0.05       # hand-surface to bottle-surface gap
+```
+Body proportions (`HUMAN_HIP_HEIGHT`, `HUMAN_TORSO_LEN`,
+`HUMAN_UPPER_ARM_LEN`, ...) sit right below them.
+
+- **`HUMAN_AUTO_PLACE = True`**: `HUMAN_BASE_XY` is only a starting point. The
+  whole figure slides sideways so the reaching hand ends exactly
+  `HUMAN_REACH_CLEARANCE` from the bottle, whatever angles you choose. The
+  hand must end up between the bottle's bottom and the top of its body
+  (z = 0 to 0.16), otherwise import raises a `ValueError` that says so.
+- **`HUMAN_AUTO_PLACE = False`**: the feet go exactly at `HUMAN_BASE_XY` and
+  nothing is adjusted.
+
+After any change, run `python scripts/scene.py --check`. It prints each body
+part's distance to its nearest object (robot at its home keyframe). It fails
+if the reaching hand is closer than the clearance, or if any part goes into
+something. To look at the pose, run `python scripts/scene.py` and orbit the
+viewer. The figure is static, so its joints don't show up in the viewer's
+joint sliders.
+
 ### 4.6 ChArUco calibration board
 
 ```python
@@ -415,6 +452,7 @@ instead of the inclusion set.
 
 - **Table legs**: `_legs_xml()` in `scripts/scene.py`
 - **Block clutter**: `_blocks_xml()` in `scripts/scene.py`
+- **Human figure (pose chain, auto-placement)**: `_human_xml()` / `human_base_xy()` in `scripts/scene.py`
 - **Full XML assembly**: `build_scene_xml()` in `scripts/scene.py`
 - **Compiling (meshdir/keyframe workarounds)**: `_compile_model()` in `scripts/scene.py`
 - **Camera intrinsics (fx/fy/cx/cy ↔ MuJoCo fovy)**: `Intrinsics` class + `ORBBEC` instance in `scripts/mujoco_rgbd_node.py`
